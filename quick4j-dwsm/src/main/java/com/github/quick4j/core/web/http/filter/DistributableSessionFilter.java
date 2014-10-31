@@ -1,4 +1,4 @@
-package com.github.quick4j.core.web.http.distributed.session.filter;
+package com.github.quick4j.core.web.http.filter;
 
 import com.github.quick4j.core.web.http.distributed.session.SessionManager;
 import com.github.quick4j.core.web.http.distributed.session.helper.CookieHelper;
