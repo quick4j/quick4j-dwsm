@@ -52,8 +52,13 @@ public class StickyHttpSession extends DistributedHttpSession {
     public void setAttribute(String name, Object value) {
         access();
 
+        if(null == value){
+            removeAttribute(name);
+            return;
+        }
+
         Object oldValue = attributes.get(name);
-        if(oldValue instanceof HttpSessionBindingListener){
+        if(value instanceof HttpSessionBindingListener){
             if(value != oldValue){
                 try{
                     ((HttpSessionBindingListener)value).valueBound(new HttpSessionBindingEvent(this, name, value));

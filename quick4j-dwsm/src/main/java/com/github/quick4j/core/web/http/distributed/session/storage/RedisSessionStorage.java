@@ -1,5 +1,6 @@
 package com.github.quick4j.core.web.http.distributed.session.storage;
 
+import com.github.quick4j.core.web.http.distributed.session.Configuration;
 import com.github.quick4j.core.web.http.distributed.session.SessionStorage;
 import com.github.quick4j.core.web.http.distributed.session.session.metadata.SessionMetaData;
 import com.github.quick4j.core.web.http.distributed.session.util.SerializationUtils;
@@ -18,11 +19,16 @@ public class RedisSessionStorage implements SessionStorage {
     private static final String SESSION_METADATA_KEY = "httpsession:%s:metadata";
     private static final String SESSION_ATTRIBUTE_KEY = "httpsession:%s:attribute";
     private Jedis jedis;
+    private String redisServerName;
+
+    public RedisSessionStorage(Configuration config) {
+        redisServerName = config.getProperty("redisServerName");
+    }
 
     @Override
     public void start() {
         logger.info("启动Session Storage for redis.");
-        jedis = new Jedis("192.168.56.110");
+        jedis = new Jedis(redisServerName);
     }
 
     @Override

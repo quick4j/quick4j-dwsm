@@ -1,5 +1,6 @@
 package com.github.quick4j.core.web.http.distributed.session.manager;
 
+import com.github.quick4j.core.web.http.distributed.session.Configuration;
 import com.github.quick4j.core.web.http.distributed.session.SessionIDManager;
 import com.github.quick4j.core.web.http.distributed.session.SessionManager;
 import com.github.quick4j.core.web.http.distributed.session.SessionStorage;
@@ -25,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 public abstract class AbstractSessionManager implements SessionManager{
     private final Logger logger = LoggerFactory.getLogger(AbstractSessionManager.class);
 
-    private int maxInactiveInterval;
+    private int maxInactiveInterval = 60 * 30;
     private ServletContext servletContext;
 
     private Map<String, HttpSession> localSessionContainer = new ConcurrentHashMap<String, HttpSession>();
@@ -33,26 +34,32 @@ public abstract class AbstractSessionManager implements SessionManager{
     private SessionIDManager sessionIdManager;
     private ScheduledExecutorService scheduledExecutorService;
 
+    public AbstractSessionManager(Configuration config){
+        this.servletContext = config.getServletContext();
 
-    public AbstractSessionManager(ServletContext servletContext, int maxInactiveInterval) {
-        this.servletContext = servletContext;
-        this.maxInactiveInterval = maxInactiveInterval;
+        try{
+            maxInactiveInterval = 60 * Integer.parseInt(config.getProperty("sessionTimeout"));
+        }catch (NumberFormatException e){}
+
+        sessionIdManager = new DefaultSessionIDManager();
+        sessionStorage = new RedisSessionStorage(config);
+        scheduledExecutorService = Executors.newScheduledThreadPool(1);
     }
 
-    protected abstract HttpSession newHttpSession(String id, int maxInactiveInterval, ServletContext servletContext);
-    protected abstract HttpSession findHttpSession(String id);
+    protected abstract HttpSession newHttpSession(String id, int maxInactiveInterval);
+    protected abstract HttpSession newHttpSession(SessionMetaData metaData);
 
     @Override
     public HttpSession newHttpSession(HttpServletRequest request) {
         String id = newSessionId(request);
-        HttpSession session = newHttpSession(id, maxInactiveInterval, servletContext);
+        HttpSession session = newHttpSession(id, maxInactiveInterval);
         addSessionToLocal(session);
         return session;
     }
 
     @Override
     public HttpSession getHttpSession(String id) {
-        HttpSession session = findHttpSession(id);
+        HttpSession session = getSessionFromLocalOrStorage(id);
         addSessionToLocal(session);
         return session;
     }
@@ -73,16 +80,9 @@ public abstract class AbstractSessionManager implements SessionManager{
     @Override
     public void start() {
         logger.info("启动Session Manager.");
-        sessionIdManager = new DefaultSessionIDManager();
         sessionIdManager.start();
-
-        sessionStorage = new RedisSessionStorage();
         sessionStorage.start();
-
-        scheduledExecutorService = Executors.newScheduledThreadPool(1);
-        scheduledExecutorService.scheduleWithFixedDelay(
-                new ClearInvalidSessionScheduledTask(localSessionContainer),
-                10, 10, TimeUnit.SECONDS);
+        startClearInvalidSessionScheduledTask();
     }
 
     @Override
@@ -101,7 +101,7 @@ public abstract class AbstractSessionManager implements SessionManager{
         return servletContext;
     }
 
-    protected boolean isStaleSession(HttpSession session){
+    private boolean isStaleSession(HttpSession session){
         Object lastAccessedTime = session.getLastAccessedTime();
         if(sessionStorage.isStored(session)){
             lastAccessedTime = sessionStorage.getSessionMetaDataField(session.getId(), SessionMetaData.LAST_ACCESSED_TIME_KEY);
@@ -109,11 +109,31 @@ public abstract class AbstractSessionManager implements SessionManager{
         return  session.getLastAccessedTime() != Long.valueOf(String.valueOf(lastAccessedTime)).longValue();
     }
 
-    protected SessionMetaData getSessionMetaDataFromStorage(String id){
-        return sessionStorage.getSessionMetaData(id);
+    private HttpSession getSessionFromLocalOrStorage(String id){
+        HttpSession session = findSessionFromLocalAndRefresh(id);
+        if(null != session){
+            return session;
+        }
+
+        logger.info("本地不存在session[{}]的信息，从storage中获取。", id);
+        return findSessionFromStorage(id);
     }
 
-    protected HttpSession findSessionFromLocal(String id){
+    private HttpSession findSessionFromStorage(String id){
+        HttpSession session = null;
+        SessionMetaData metaData = sessionStorage.getSessionMetaData(id);
+
+        if(null == metaData){
+            logger.info("storage中不存在session[{}]的信息。", id);
+            return session;
+        }
+
+        logger.debug("Session Storage中持有session[{}]的信息.", id);
+        logger.info("根据Session Storage中的信息构建session[{}].", id);
+        return newHttpSession(metaData);
+    }
+
+    private HttpSession findSessionFromLocalAndRefresh(String id){
         HttpSession session = localSessionContainer.get(id);
         if(null != session){
             logger.info("本地持有session[{}]的信息.", id);
@@ -143,5 +163,11 @@ public abstract class AbstractSessionManager implements SessionManager{
 
     private void removeSessionFromStorage(HttpSession session){
         sessionStorage.removeSession(session.getId());
+    }
+
+    private void startClearInvalidSessionScheduledTask(){
+        scheduledExecutorService.scheduleWithFixedDelay(
+                new ClearInvalidSessionScheduledTask(localSessionContainer),
+                10, 10, TimeUnit.SECONDS);
     }
 }

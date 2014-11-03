@@ -1,5 +1,6 @@
 package com.github.quick4j.core.web.http.filter;
 
+import com.github.quick4j.core.web.http.distributed.session.Configuration;
 import com.github.quick4j.core.web.http.distributed.session.SessionManager;
 import com.github.quick4j.core.web.http.distributed.session.helper.CookieHelper;
 import com.github.quick4j.core.web.http.distributed.session.manager.NoStickySessionManager;
@@ -20,26 +21,20 @@ import java.io.IOException;
 public class DistributableSessionFilter implements Filter {
     private static Logger logger = LoggerFactory.getLogger(DistributableSessionFilter.class);
     private SessionManager sessionManager;
-    private int maxInactiveInterval = 60 * 30;
-    private String loadBalancingStrategy = "sticky";
+    private Configuration config;
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
-        String sessionTimeout = filterConfig.getInitParameter("sessionTimeout");
-        //默认最大有效期30分钟
-        try{
-            maxInactiveInterval = 60 * Integer.parseInt(sessionTimeout);
-        }catch (NumberFormatException e){}
+        config = new Configuration(filterConfig);
 
-
-        loadBalancingStrategy = filterConfig.getInitParameter("loadBalancingStrategy");
-        if(loadBalancingStrategy.equalsIgnoreCase("sticky")){
+        if(config.getProperty("loadBalancingStrategy", "sticky").equalsIgnoreCase("sticky")){
             logger.info("应用负载均衡策略为： Sticky Session");
-            sessionManager = new StickySessionManager(filterConfig.getServletContext(), maxInactiveInterval);
+            sessionManager = new StickySessionManager(config);
         }else{
             logger.info("应用负载均衡策略为： 非Sticky Session");
-            sessionManager = new NoStickySessionManager(filterConfig.getServletContext(), maxInactiveInterval);
+            sessionManager = new NoStickySessionManager(config);
         }
+
         sessionManager.start();
     }
 
@@ -59,10 +54,6 @@ public class DistributableSessionFilter implements Filter {
 
                 logger.info("============================");
                 String sessionid = getRequestedSessionId();
-
-                if(null == sessionid){
-                    logger.info("当前request还未与Session关联.");
-                }
 
                 if(sessionid != null){
                     logger.info("当前request与session[{}]关联.", sessionid);

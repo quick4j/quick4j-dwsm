@@ -15,8 +15,8 @@ public abstract class DistributedHttpSession implements HttpSession {
     private String id;
     private final long creationTime;
     private int maxInactiveInterval;
-    private boolean newSession;
-    private boolean persistent;
+    private boolean newSession = false;
+    private boolean persistent = false;
     private boolean validate = true;
     private ServletContext servletContext;
 
@@ -33,9 +33,8 @@ public abstract class DistributedHttpSession implements HttpSession {
         this.creationTime = System.currentTimeMillis();
         this.lastAccessedTime = this.creationTime;
         this.maxInactiveInterval = maxInactiveInterval;
-        this.sessionManager = sessionManager;
         this.newSession = true;
-        this.persistent = false;
+        this.sessionManager = sessionManager;
         this.servletContext = servletContext;
     }
 
@@ -49,9 +48,8 @@ public abstract class DistributedHttpSession implements HttpSession {
         this.creationTime = creationTime;
         this.lastAccessedTime = lastAccessedTime;
         this.maxInactiveInterval = maxInactiveInterval;
-        this.sessionManager = sessionManager;
-        this.newSession = false;
         this.persistent = true;
+        this.sessionManager = sessionManager;
         this.servletContext = servletContext;
     }
 
