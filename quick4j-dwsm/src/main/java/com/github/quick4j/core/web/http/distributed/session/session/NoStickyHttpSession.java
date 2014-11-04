@@ -6,10 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpSessionAttributeListener;
 import javax.servlet.http.HttpSessionBindingEvent;
 import javax.servlet.http.HttpSessionBindingListener;
-import java.util.Collections;
-import java.util.Enumeration;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author zhaojh.
@@ -36,7 +37,8 @@ public class NoStickyHttpSession extends DistributedHttpSession {
     @Override
     public Object getAttribute(String name) {
         access();
-        return sessionManager.getSessionStorage().getSessionAttribute(getId(), name);
+        Object value = sessionManager.getSessionStorage().getSessionAttribute(getId(), name);
+        return value;
     }
 
     @Override
@@ -49,11 +51,19 @@ public class NoStickyHttpSession extends DistributedHttpSession {
     public void setAttribute(String name, Object value) {
         access();
 
+        if(null == value){
+            removeAttribute(name);
+            return;
+        }
+
+        HttpSessionBindingEvent event = null;
+
         Object oldValue = getAttribute(name);
         if(value instanceof HttpSessionBindingListener){
             if(value != oldValue){
+                event = new HttpSessionBindingEvent(this, name, value);
                 try{
-                    ((HttpSessionBindingListener)value).valueBound(new HttpSessionBindingEvent(this, name, value));
+                    ((HttpSessionBindingListener)value).valueBound(event);
                 }catch (Exception e){
                     logger.error("bingEvent error:", e);
                     throw new RuntimeException(e);
@@ -71,20 +81,61 @@ public class NoStickyHttpSession extends DistributedHttpSession {
                 throw new RuntimeException(e);
             }
         }
+
+        List<EventListener> listeners = sessionManager.getEventListeners();
+        for(EventListener eventListener : listeners){
+            if(!(eventListener instanceof HttpSessionAttributeListener)){
+                continue;
+            }
+
+            HttpSessionAttributeListener listener = (HttpSessionAttributeListener) eventListener;
+            if(null != oldValue){
+                if(null == event){
+                    event = new HttpSessionBindingEvent(this, name, oldValue);
+                }
+                listener.attributeReplaced(event);
+            }else{
+                if(null == event){
+                    event = new HttpSessionBindingEvent(this, name, value);
+                }
+                listener.attributeAdded(event);
+            }
+        }
     }
 
     @Override
     public void removeAttribute(String name) {
         access();
-        Object oldValue = getAttribute(name);
+        Object value = getAttribute(name);
+
+        if(null == value){
+            return;
+        }
+
+        HttpSessionBindingEvent event = null;
         sessionManager.getSessionStorage().removeSessionAttribute(getId(), name);
-        if(null != oldValue && oldValue instanceof HttpSessionBindingListener){
+        if(null != value && value instanceof HttpSessionBindingListener){
+            event = new HttpSessionBindingEvent(this, name);
             try{
-                ((HttpSessionBindingListener)oldValue).valueUnbound(new HttpSessionBindingEvent(this, name));
+                ((HttpSessionBindingListener)value).valueUnbound(event);
             }catch (Exception e){
                 logger.error("bingEvent error:", e);
                 throw new RuntimeException(e);
             }
+        }
+
+
+        List<EventListener> listeners = sessionManager.getEventListeners();
+        for(EventListener eventListener : listeners){
+            if(!(eventListener instanceof HttpSessionAttributeListener)){
+                continue;
+            }
+
+            HttpSessionAttributeListener listener = (HttpSessionAttributeListener) eventListener;
+            if(event == null){
+                event = new HttpSessionBindingEvent(this, name, value);
+            }
+            listener.attributeRemoved(event);
         }
     }
 

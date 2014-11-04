@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="sessionManager" depends-on="sessionIdManager, sessionStorage"
+          class="com.github.quick4j.core.web.http.distributed.session.manager.StickySessionManager">
+        <property name="sessionIdManager" ref="sessionIdManager"/>
+        <property name="sessionStorage" ref="sessionStorage"/>
+        <property name="sessionTimeout" value="5"/>
+        <property name="eventListeners">
+            <list>
+                <bean class="com.github.quick4j.hello.http.listener.CustomHttpSessionLister"/>
+                <bean class="com.github.quick4j.hello.http.listener.CustomHttpSessionAttributeListener"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="sessionIdManager"
+          class="com.github.quick4j.core.web.http.distributed.session.manager.DefaultSessionIDManager"/>
+
+    <bean id="sessionStorage"
+          class="com.github.quick4j.core.web.http.distributed.session.storage.RedisSessionStorage">
+        <property name="redisServerName" value="192.168.56.110"/>
+    </bean>
+
+    <bean id="distributableSessionFilter" depends-on="sessionManager"
+          class="com.github.quick4j.core.web.http.filter.DistributableSessionFilter"/>
+</beans>

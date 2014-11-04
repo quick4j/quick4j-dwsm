@@ -5,11 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpSessionAttributeListener;
 import javax.servlet.http.HttpSessionBindingEvent;
 import javax.servlet.http.HttpSessionBindingListener;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -57,11 +56,14 @@ public class StickyHttpSession extends DistributedHttpSession {
             return;
         }
 
-        Object oldValue = attributes.get(name);
+        HttpSessionBindingEvent event = null;
+
         if(value instanceof HttpSessionBindingListener){
+            Object oldValue = attributes.get(name);
             if(value != oldValue){
+                event = new HttpSessionBindingEvent(this, name, value);
                 try{
-                    ((HttpSessionBindingListener)value).valueBound(new HttpSessionBindingEvent(this, name, value));
+                    ((HttpSessionBindingListener)value).valueBound(event);
                 }catch (Exception e){
                     logger.error("bingEvent error:", e);
                     throw new RuntimeException(e);
@@ -80,20 +82,60 @@ public class StickyHttpSession extends DistributedHttpSession {
                 throw new RuntimeException(e);
             }
         }
+
+        List<EventListener> listeners = sessionManager.getEventListeners();
+        for(EventListener eventListener : listeners){
+            if(!(eventListener instanceof HttpSessionAttributeListener)){
+                continue;
+            }
+
+            HttpSessionAttributeListener listener = (HttpSessionAttributeListener) eventListener;
+            if(unbound != null){
+                if(null == event){
+                    event = new HttpSessionBindingEvent(this, name, unbound);
+                }
+                listener.attributeReplaced(event);
+            }else{
+                if(null == event){
+                    event = new HttpSessionBindingEvent(this, name, value);
+                }
+                listener.attributeAdded(event);
+            }
+        }
     }
 
     @Override
     public void removeAttribute(String name) {
         access();
         sessionManager.getSessionStorage().removeSessionAttribute(getId(), name);
-        Object unbound = attributes.remove(name);
-        if(null != unbound && unbound instanceof HttpSessionBindingListener){
+        Object value = attributes.remove(name);
+
+        if(null == value){
+            return;
+        }
+
+        HttpSessionBindingEvent event = null;
+        if(null != value && value instanceof HttpSessionBindingListener){
+            event = new HttpSessionBindingEvent(this, name, value);
             try{
-                ((HttpSessionBindingListener)unbound).valueUnbound(new HttpSessionBindingEvent(this, name));
+                ((HttpSessionBindingListener)value).valueUnbound(event);
             }catch (Exception e){
                 logger.error("bingEvent error:", e);
                 throw new RuntimeException(e);
             }
+        }
+
+        List<EventListener> listeners = sessionManager.getEventListeners();
+        for(EventListener eventListener : listeners){
+            if(!(eventListener instanceof HttpSessionAttributeListener)){
+                continue;
+            }
+
+            HttpSessionAttributeListener listener = (HttpSessionAttributeListener) eventListener;
+            if(event == null){
+                event = new HttpSessionBindingEvent(this, name, value);
+            }
+            listener.attributeRemoved(event);
         }
     }
 

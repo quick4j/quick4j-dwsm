@@ -42,7 +42,7 @@ public class DefaultSessionIDManager implements SessionIDManager {
 
     @Override
     public void stop() {
-
+        logger.info("关闭Session ID Manager.");
     }
 
     private String newSessionId(long seedTerm){

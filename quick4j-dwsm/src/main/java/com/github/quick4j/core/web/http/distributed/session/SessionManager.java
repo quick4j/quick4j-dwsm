@@ -1,7 +1,10 @@
 package com.github.quick4j.core.web.http.distributed.session;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import java.util.EventListener;
+import java.util.List;
 
 /**
  * @author zhaojh.
@@ -14,4 +17,6 @@ public interface SessionManager extends LifeCycle {
     boolean isValid(HttpSession session);
     void removeHttpSession(HttpSession session);
     SessionStorage getSessionStorage();
+    void setServletContext(ServletContext servletContext);
+    List<EventListener> getEventListeners();
 }

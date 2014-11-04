@@ -15,9 +15,9 @@ import javax.servlet.http.HttpSession;
  */
 public class StickySessionManager extends AbstractSessionManager {
 
-    public StickySessionManager(Configuration config) {
-        super(config);
-    }
+//    public StickySessionManager(Configuration config) {
+//        super(config);
+//    }
 
     @Override
     protected HttpSession newHttpSession(String id, int maxInactiveInterval) {

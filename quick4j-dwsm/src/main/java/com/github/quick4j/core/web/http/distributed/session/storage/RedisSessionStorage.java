@@ -1,6 +1,5 @@
 package com.github.quick4j.core.web.http.distributed.session.storage;
 
-import com.github.quick4j.core.web.http.distributed.session.Configuration;
 import com.github.quick4j.core.web.http.distributed.session.SessionStorage;
 import com.github.quick4j.core.web.http.distributed.session.session.metadata.SessionMetaData;
 import com.github.quick4j.core.web.http.distributed.session.util.SerializationUtils;
@@ -21,8 +20,9 @@ public class RedisSessionStorage implements SessionStorage {
     private Jedis jedis;
     private String redisServerName;
 
-    public RedisSessionStorage(Configuration config) {
-        redisServerName = config.getProperty("redisServerName");
+
+    public void setRedisServerName(String redisServerName) {
+        this.redisServerName = redisServerName;
     }
 
     @Override
@@ -34,6 +34,7 @@ public class RedisSessionStorage implements SessionStorage {
     @Override
     public void stop() {
         jedis.quit();
+        logger.info("关闭与Redis服务器的链接。");
     }
 
     @Override

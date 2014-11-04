@@ -5,6 +5,7 @@ import com.github.quick4j.core.web.http.distributed.session.session.metadata.Ses
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpSession;
+import javax.servlet.http.HttpSessionBindingEvent;
 import javax.servlet.http.HttpSessionContext;
 import java.util.Collections;
 
@@ -151,4 +152,5 @@ public abstract class DistributedHttpSession implements HttpSession {
             sessionManager.getSessionStorage().updateSessionMetaDataField(getId(), SessionMetaData.LAST_ACCESSED_TIME_KEY, lastAccessedTime);
         }
     }
+
 }

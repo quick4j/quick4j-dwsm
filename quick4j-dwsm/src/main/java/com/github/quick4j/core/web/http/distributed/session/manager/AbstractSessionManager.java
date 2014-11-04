@@ -1,19 +1,26 @@
 package com.github.quick4j.core.web.http.distributed.session.manager;
 
-import com.github.quick4j.core.web.http.distributed.session.Configuration;
 import com.github.quick4j.core.web.http.distributed.session.SessionIDManager;
 import com.github.quick4j.core.web.http.distributed.session.SessionManager;
 import com.github.quick4j.core.web.http.distributed.session.SessionStorage;
 import com.github.quick4j.core.web.http.distributed.session.manager.task.ClearInvalidSessionScheduledTask;
 import com.github.quick4j.core.web.http.distributed.session.session.DistributedHttpSession;
+import com.github.quick4j.core.web.http.distributed.session.session.SessionEventType;
 import com.github.quick4j.core.web.http.distributed.session.session.metadata.SessionMetaData;
-import com.github.quick4j.core.web.http.distributed.session.storage.RedisSessionStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import javax.servlet.http.HttpSessionEvent;
+import javax.servlet.http.HttpSessionListener;
+import java.util.ArrayList;
+import java.util.EventListener;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -23,36 +30,64 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author zhaojh.
  */
-public abstract class AbstractSessionManager implements SessionManager{
+public abstract class AbstractSessionManager implements SessionManager, InitializingBean, DisposableBean{
     private final Logger logger = LoggerFactory.getLogger(AbstractSessionManager.class);
 
     private int maxInactiveInterval = 60 * 30;
     private ServletContext servletContext;
 
+    private List<EventListener> listeners = new ArrayList<EventListener>();
     private Map<String, HttpSession> localSessionContainer = new ConcurrentHashMap<String, HttpSession>();
+    @Autowired
     private SessionStorage sessionStorage;
+    @Autowired
     private SessionIDManager sessionIdManager;
-    private ScheduledExecutorService scheduledExecutorService;
-
-    public AbstractSessionManager(Configuration config){
-        this.servletContext = config.getServletContext();
-
-        try{
-            maxInactiveInterval = 60 * Integer.parseInt(config.getProperty("sessionTimeout"));
-        }catch (NumberFormatException e){}
-
-        sessionIdManager = new DefaultSessionIDManager();
-        sessionStorage = new RedisSessionStorage(config);
-        scheduledExecutorService = Executors.newScheduledThreadPool(1);
-    }
+    private ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
 
     protected abstract HttpSession newHttpSession(String id, int maxInactiveInterval);
     protected abstract HttpSession newHttpSession(SessionMetaData metaData);
 
     @Override
+    public void destroy() throws Exception {
+        stop();
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        start();
+    }
+
+    public void setSessionStorage(SessionStorage sessionStorage) {
+        this.sessionStorage = sessionStorage;
+    }
+
+    public void setSessionIdManager(SessionIDManager sessionIdManager) {
+        this.sessionIdManager = sessionIdManager;
+    }
+
+    public void setSessionTimeout(int maxInactiveInterval) {
+        this.maxInactiveInterval = 60 * maxInactiveInterval;
+    }
+
+    public void setEventListeners(List<EventListener> listeners){
+        this.listeners = listeners;
+    }
+
+    @Override
+    public List<EventListener> getEventListeners() {
+        return listeners;
+    }
+
+    @Override
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
+    }
+
+    @Override
     public HttpSession newHttpSession(HttpServletRequest request) {
         String id = newSessionId(request);
         HttpSession session = newHttpSession(id, maxInactiveInterval);
+        fireSessionCreatedEvent(session);
         addSessionToLocal(session);
         return session;
     }
@@ -66,6 +101,7 @@ public abstract class AbstractSessionManager implements SessionManager{
 
     @Override
     public void removeHttpSession(HttpSession session) {
+        fireSessionDestroyedEvent(session);
         removeSessionFromStorage(session);
         removeSessionFromLocal(session);
     }
@@ -169,5 +205,32 @@ public abstract class AbstractSessionManager implements SessionManager{
         scheduledExecutorService.scheduleWithFixedDelay(
                 new ClearInvalidSessionScheduledTask(localSessionContainer),
                 10, 10, TimeUnit.SECONDS);
+    }
+
+    private void fireSessionEvent(SessionEventType type, HttpSession session){
+        switch (type){
+            case SESSION_CREATED_EVENT:
+                fireSessionCreatedEvent(session);
+                break;
+            case SESSION_DESTROYED_EVENT:
+                fireSessionDestroyedEvent(session);
+                break;
+        }
+    }
+
+    private void fireSessionCreatedEvent(HttpSession session){
+        for (EventListener listener : listeners){
+            if(listener instanceof HttpSessionListener){
+                ((HttpSessionListener) listener).sessionCreated(new HttpSessionEvent(session));
+            }
+        }
+    }
+
+    private void fireSessionDestroyedEvent(HttpSession session){
+        for(EventListener listener : listeners){
+            if(listener instanceof HttpSessionListener){
+                ((HttpSessionListener) listener).sessionDestroyed(new HttpSessionEvent(session));
+            }
+        }
     }
 }

@@ -7,7 +7,9 @@ import com.github.quick4j.core.web.http.distributed.session.manager.NoStickySess
 import com.github.quick4j.core.web.http.distributed.session.manager.StickySessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.context.ContextLoader;
 
+import javax.annotation.Resource;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
@@ -20,22 +22,13 @@ import java.io.IOException;
  */
 public class DistributableSessionFilter implements Filter {
     private static Logger logger = LoggerFactory.getLogger(DistributableSessionFilter.class);
-    private SessionManager sessionManager;
-    private Configuration config;
+    private  SessionManager sessionManager;
+
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
-        config = new Configuration(filterConfig);
-
-        if(config.getProperty("loadBalancingStrategy", "sticky").equalsIgnoreCase("sticky")){
-            logger.info("应用负载均衡策略为： Sticky Session");
-            sessionManager = new StickySessionManager(config);
-        }else{
-            logger.info("应用负载均衡策略为： 非Sticky Session");
-            sessionManager = new NoStickySessionManager(config);
-        }
-
-        sessionManager.start();
+        sessionManager = ContextLoader.getCurrentWebApplicationContext().getBean(SessionManager.class);
+        sessionManager.setServletContext(filterConfig.getServletContext());
     }
 
     @Override
@@ -107,7 +100,5 @@ public class DistributableSessionFilter implements Filter {
     }
 
     @Override
-    public void destroy() {
-        sessionManager.stop();
-    }
+    public void destroy() {}
 }

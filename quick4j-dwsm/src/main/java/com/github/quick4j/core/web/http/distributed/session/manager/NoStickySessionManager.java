@@ -15,10 +15,6 @@ import javax.servlet.http.HttpSession;
 public class NoStickySessionManager extends AbstractSessionManager {
     private static final Logger logger = LoggerFactory.getLogger(NoStickySessionManager.class);
 
-    public NoStickySessionManager(Configuration config) {
-        super(config);
-    }
-
     @Override
     protected HttpSession newHttpSession(String id, int maxInactiveInterval) {
         return new NoStickyHttpSession(id, maxInactiveInterval, this, getServletContext());
