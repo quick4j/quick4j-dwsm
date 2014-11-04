@@ -2,9 +2,9 @@ package com.github.quick4j.core.web.http.distributed.session.storage;
 
 import com.github.quick4j.core.web.http.distributed.session.SessionStorage;
 import com.github.quick4j.core.web.http.distributed.session.session.metadata.SessionMetaData;
-import com.github.quick4j.core.web.http.distributed.session.util.SerializationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.SerializationUtils;
 import redis.clients.jedis.Jedis;
 
 import javax.servlet.http.HttpSession;
