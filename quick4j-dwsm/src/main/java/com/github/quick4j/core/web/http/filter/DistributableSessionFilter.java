@@ -1,15 +1,11 @@
 package com.github.quick4j.core.web.http.filter;
 
-import com.github.quick4j.core.web.http.distributed.session.Configuration;
 import com.github.quick4j.core.web.http.distributed.session.SessionManager;
 import com.github.quick4j.core.web.http.distributed.session.helper.CookieHelper;
-import com.github.quick4j.core.web.http.distributed.session.manager.NoStickySessionManager;
-import com.github.quick4j.core.web.http.distributed.session.manager.StickySessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.context.ContextLoader;
 
-import javax.annotation.Resource;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
